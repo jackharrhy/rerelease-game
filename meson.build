@@ -31,6 +31,7 @@ src = [
   'rerelease/g_trigger.cpp',
   'rerelease/g_turret.cpp',
   'rerelease/g_utils.cpp',
+  'rerelease/g_vehicle.cpp',
   'rerelease/g_weapon.cpp',
   'rerelease/game.h',
   'rerelease/m_actor.cpp',

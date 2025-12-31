@@ -323,6 +323,9 @@ void ClientObituary(edict_t *self, edict_t *inflictor, edict_t *attacker, mod_t 
 			base = "$g_mod_kill_grapple";
 			break;
 			// ZOID
+		case MOD_VEHICLE:
+			base = "$g_mod_kill_vehicle";
+			break;
 		default:
 			base = "$g_mod_kill_generic";
 			break;
@@ -3202,18 +3205,25 @@ void ClientThink(edict_t *ent, usercmd_t *ucmd)
 		client->resp.cmd_angles = ucmd->angles;
 		ent->movetype = MOVETYPE_NOCLIP;
 	}
+	else if (ent->vehicle)
+	{
+		// Player is driving a vehicle - vehicle_think handles movement
+		// Just update view angles from input
+		client->resp.cmd_angles = ucmd->angles;
+		return;
+	}
 	else
 	{
 
 		// set up for pmove
 		memset(&pm, 0, sizeof(pm));
-		
+
 		if (ent->movetype == MOVETYPE_NOCLIP)
 		{
 			if (ent->client->menu)
 			{
 				client->ps.pmove.pm_type = PM_FREEZE;
-				
+
 				// [Paril-KEX] handle menu movement
 				HandleMenuMovement(ent, ucmd);
 			}
@@ -3333,6 +3343,14 @@ void ClientThink(edict_t *ent, usercmd_t *ucmd)
 		ent->groundentity = pm.groundentity;
 		if (pm.groundentity)
 			ent->groundentity_linkcount = pm.groundentity->linkcount;
+
+		// Don't set groundentity for vehicle drivers - they're handled in vehicle_think
+		// and setting groundentity would cause them to be moved by entity parenting code
+		if (ent->vehicle)
+		{
+			ent->groundentity = nullptr;
+			ent->groundentity_linkcount = 0;
+		}
 
 		if (ent->deadflag)
 		{

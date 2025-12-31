@@ -249,38 +249,28 @@ edict_t *obstacle;
 
 /*
 ============
-SV_Push
+SV_PushEntities
 
-Objects need to be moved back on a failed push,
-otherwise riders would continue to slide.
+Moves entities that are on or inside a pusher that has already moved.
+Assumes the pusher is already in its final position.
+Returns true if all entities moved successfully, false if blocked.
+Sets obstacle global if blocked.
 ============
 */
-bool SV_Push(edict_t *pusher, vec3_t &move, vec3_t &amove)
+static bool SV_PushEntities(edict_t *pusher, const vec3_t &move, const vec3_t &amove)
 {
-	edict_t	*check, *block = nullptr;
-	vec3_t	  mins, maxs;
+	edict_t *check, *block = nullptr;
+	vec3_t mins, maxs;
 	pushed_t *p;
-	vec3_t	  org, org2, move2, forward, right, up;
+	vec3_t org, org2, move2, forward, right, up;
 
-	// find the bounding box
-	mins = pusher->absmin + move;
-	maxs = pusher->absmax + move;
+	// find the bounding box (pusher is already in final position)
+	mins = pusher->absmin;
+	maxs = pusher->absmax;
 
 	// we need this for pushing things later
 	org = -amove;
 	AngleVectors(org, forward, right, up);
-
-	// save the pusher's original position
-	pushed_p->ent = pusher;
-	pushed_p->origin = pusher->s.origin;
-	pushed_p->angles = pusher->s.angles;
-	pushed_p->rotated = false;
-	pushed_p++;
-
-	// move the pusher to it's final position
-	pusher->s.origin += move;
-	pusher->s.angles += amove;
-	gi.linkentity(pusher);
 
 	// see if any solid entities are inside the final position
 	check = g_edicts + 1;
@@ -295,6 +285,10 @@ bool SV_Push(edict_t *pusher, vec3_t &move, vec3_t &amove)
 		if (!check->linked)
 			continue; // not linked in anywhere
 
+		// Skip the pusher itself and the driver (driver is handled separately in vehicle_think)
+		if (check == pusher || check == pusher->owner)
+			continue;
+
 		// if the entity is standing on the pusher, it will definitely be moved
 		if (check->groundentity != pusher)
 		{
@@ -308,7 +302,11 @@ bool SV_Push(edict_t *pusher, vec3_t &move, vec3_t &amove)
 				continue;
 		}
 
-		if ((pusher->movetype == MOVETYPE_PUSH) || (check->groundentity == pusher))
+		// Move entities if:
+		// 1. Pusher is MOVETYPE_PUSH (trains, platforms) - move all entities in bbox
+		// 2. Pusher is MOVETYPE_VEHICLE - move all entities in bbox (vehicles)
+		// 3. Entity has pusher as groundentity (standing on it)
+		if ((pusher->movetype == MOVETYPE_PUSH) || (pusher->movetype == MOVETYPE_VEHICLE) || (check->groundentity == pusher))
 		{
 			// move this entity
 			pushed_p->ent = check;
@@ -402,6 +400,32 @@ bool SV_Push(edict_t *pusher, vec3_t &move, vec3_t &amove)
 		G_TouchTriggers(p->ent);
 
 	return true;
+}
+
+/*
+============
+SV_Push
+
+Objects need to be moved back on a failed push,
+otherwise riders would continue to slide.
+============
+*/
+bool SV_Push(edict_t *pusher, vec3_t &move, vec3_t &amove)
+{
+	// save the pusher's original position
+	pushed_p->ent = pusher;
+	pushed_p->origin = pusher->s.origin;
+	pushed_p->angles = pusher->s.angles;
+	pushed_p->rotated = false;
+	pushed_p++;
+
+	// move the pusher to it's final position
+	pusher->s.origin += move;
+	pusher->s.angles += amove;
+	gi.linkentity(pusher);
+
+	// use the helper function to move entities
+	return SV_PushEntities(pusher, move, amove);
 }
 
 /*
@@ -937,6 +961,359 @@ inline void G_RunBmodelAnimation(edict_t *ent)
 }
 
 //============================================================================
+// Vehicle Physics
+//============================================================================
+
+/*
+============
+SV_VehicleMove
+
+Move a vehicle entity with rotating bounding box
+============
+*/
+static int SV_VehicleMove(edict_t *ent, float time, contents_t mask)
+{
+	constexpr int MAX_CLIP_PLANES = 5;
+
+	vec3_t primal_velocity = ent->velocity;
+	vec3_t original_velocity = ent->velocity;
+	int numplanes = 0;
+	vec3_t planes[MAX_CLIP_PLANES];
+	int blocked = 0;
+
+	vec3_t xy_velocity = ent->velocity;
+	xy_velocity[2] = 0;
+	float xy_speed = xy_velocity.length();
+
+	float time_left = time;
+
+	// Compute bounding box centered at origin
+	vec3_t origin = ent->s.origin;
+	vec3_t mins = ent->size * -0.5f;
+	vec3_t maxs = ent->size * 0.5f;
+	mins[2] += 1;
+
+	ent->groundentity = nullptr;
+
+	edict_t *ignore = ent;
+	vec3_t start = origin;
+
+	constexpr int numbumps = 4;
+
+	for (int bumpcount = 0; bumpcount < numbumps; bumpcount++)
+	{
+		vec3_t end = origin + ent->velocity * time_left;
+
+		trace_t trace = gi.trace(start, mins, maxs, end, ignore, mask);
+
+		if (trace.allsolid)
+		{
+			// Entity is trapped in another solid
+			if (trace.ent && (trace.ent->svflags & SVF_MONSTER))
+			{
+				// Monster stuck in vehicle - push them out
+				vec3_t dir = trace.ent->s.origin - ent->s.origin;
+				dir[2] = 0;
+				dir.normalize();
+				dir[2] = 0.2f;
+
+				vec3_t new_velocity = trace.ent->velocity + dir * 32.f;
+				vec3_t new_origin = trace.ent->s.origin + new_velocity * gi.frame_time_s;
+
+				trace_t tr = gi.trace(trace.ent->s.origin, trace.ent->mins, trace.ent->maxs, new_origin, trace.ent, MASK_MONSTERSOLID);
+				if (tr.fraction == 1.f)
+				{
+					trace.ent->s.origin = new_origin;
+					trace.ent->velocity = new_velocity;
+					gi.linkentity(trace.ent);
+				}
+			}
+			else if (trace.ent && trace.ent->client && xy_speed > 0)
+			{
+				// Player may have just dismounted - move them along
+				vec3_t forward, left;
+				AngleVectors(ent->s.angles, forward, left, nullptr);
+
+				vec3_t drive = ent->s.origin + forward * ent->move_origin[0] - left * ent->move_origin[1];
+				vec3_t offset = drive - trace.ent->s.origin;
+
+				if (fabsf(offset[2]) < 64)
+					offset[2] = 0;
+
+				if (offset.length() < 16)
+				{
+					trace.ent->s.origin += end - origin;
+					gi.linkentity(trace.ent);
+					goto not_allsolid;
+				}
+			}
+
+			ent->velocity = {};
+			ent->avelocity = {};
+			return 3;
+		}
+
+	not_allsolid:
+		if (trace.fraction > 0)
+		{
+			// Actually covered some distance
+			origin = trace.endpos;
+			ent->s.origin = origin;
+			original_velocity = ent->velocity;
+			numplanes = 0;
+		}
+
+		if (trace.fraction == 1.f)
+			break; // Moved the entire distance
+
+		edict_t *hit = trace.ent;
+
+		if (trace.plane.normal[2] > 0.7f)
+		{
+			blocked |= 1; // floor
+			if (hit->solid == SOLID_BSP)
+			{
+				ent->groundentity = hit;
+				ent->groundentity_linkcount = hit->linkcount;
+			}
+		}
+		if (trace.plane.normal[0] > 0 || trace.plane.normal[1] > 0)
+			blocked |= 1;
+		if (!trace.plane.normal[2])
+			blocked |= 2; // step
+
+		// Run impact function
+		G_Impact(ent, trace);
+		if (!ent->inuse)
+			break; // Vehicle destroyed
+		if (!trace.ent || !trace.ent->inuse)
+		{
+			blocked = 0;
+			break;
+		}
+
+		// Handle collisions with monsters/players (handled in vehicle_touch)
+		if (ent->owner && (trace.ent->svflags & (SVF_MONSTER | SVF_DEADMONSTER)))
+			continue;
+
+		// Match speeds with what we hit
+		ent->velocity = trace.ent->velocity;
+
+		time_left -= time_left * trace.fraction;
+
+		// Clipped to another plane
+		if (numplanes >= MAX_CLIP_PLANES)
+		{
+			ent->velocity = {};
+			ent->avelocity = {};
+			return 3;
+		}
+
+		// Players and monsters don't block us (already handled above)
+		if (trace.ent->client || (trace.ent->svflags & SVF_MONSTER))
+		{
+			blocked = 0;
+			continue;
+		}
+
+		planes[numplanes] = trace.plane.normal;
+		numplanes++;
+
+		// Modify velocity to not go into any of the clip planes
+		for (int i = 0; i < numplanes; i++)
+		{
+			ent->velocity = SlideClipVelocity(original_velocity, planes[i], 1.f);
+			int j;
+			for (j = 0; j < numplanes; j++)
+			{
+				if (j != i)
+				{
+					if (ent->velocity.dot(planes[j]) < 0)
+						break;
+				}
+			}
+			if (j == numplanes)
+				break;
+		}
+
+		if (numplanes != 2)
+		{
+			ent->velocity = {};
+			ent->avelocity = {};
+			blocked = 4;
+			break;
+		}
+
+		vec3_t dir = planes[0].cross(planes[1]);
+		float d = dir.dot(ent->velocity);
+		ent->velocity = dir * d;
+
+		if (ent->velocity.dot(primal_velocity) <= 0)
+		{
+			ent->velocity = {};
+			ent->avelocity = {};
+			return blocked;
+		}
+	}
+
+	return blocked;
+}
+
+/*
+============
+SV_Physics_Vehicle
+
+Vehicle physics runner
+============
+*/
+void SV_Physics_Vehicle(edict_t *ent)
+{
+	edict_t *part;
+	vec3_t move, amove;
+
+	// if not a team captain, so movement will be handled elsewhere
+	if (ent->flags & FL_TEAMSLAVE)
+		return;
+
+	// make sure all team slaves can move before committing
+	// any moves or calling any think functions
+	// if the move is blocked, all moved objects will be backed out
+retry:
+	pushed_p = pushed;
+	for (part = ent; part; part = part->teamchain)
+	{
+		// Check ground
+		if (!part->groundentity)
+			M_CheckGround(part, G_GetClipMask(part));
+
+		SV_CheckVelocity(part);
+
+		// Save old origin and angles for entity movement calculation
+		vec3_t old_origin = part->s.origin;
+		vec3_t old_angles = part->s.angles;
+
+		// Calculate movement and rotation
+		move = part->velocity * gi.frame_time_s;
+		amove = part->avelocity * gi.frame_time_s;
+
+		// Only process if actually moving
+		if (move[0] || move[1] || move[2] || amove[0] || amove[1] || amove[2])
+		{
+			// Move angles first
+			part->s.angles += amove;
+
+			if (part->velocity[0] || part->velocity[1] || part->velocity[2])
+			{
+				// Adjust bounding box for yaw rotation if we have an org_size
+				if (part->org_size[0])
+				{
+					float yaw = part->s.angles[YAW] * float(M_PI) / 180.f;
+					float ca = cosf(yaw);
+					float sa = sinf(yaw);
+
+					vec3_t s2 = part->org_size * 0.5f;
+
+					vec3_t p[4];
+					p[0] = {-s2[0] * ca + s2[1] * sa, -s2[1] * ca - s2[0] * sa, 0};
+					p[1] = {s2[0] * ca + s2[1] * sa, -s2[1] * ca + s2[0] * sa, 0};
+					p[2] = {-s2[0] * ca - s2[1] * sa, s2[1] * ca - s2[0] * sa, 0};
+					p[3] = {s2[0] * ca - s2[1] * sa, s2[1] * ca + s2[0] * sa, 0};
+
+					vec3_t mins, maxs;
+					mins[0] = min(min(p[0][0], p[1][0]), min(p[2][0], p[3][0]));
+					mins[1] = min(min(p[0][1], p[1][1]), min(p[2][1], p[3][1]));
+					maxs[0] = max(max(p[0][0], p[1][0]), max(p[2][0], p[3][0]));
+					maxs[1] = max(max(p[0][1], p[1][1]), max(p[2][1], p[3][1]));
+
+					part->size[0] = maxs[0] - mins[0];
+					part->size[1] = maxs[1] - mins[1];
+					part->mins[0] = -part->size[0] / 2;
+					part->mins[1] = -part->size[1] / 2;
+					part->maxs[0] = part->size[0] / 2;
+					part->maxs[1] = part->size[1] / 2;
+					gi.linkentity(part);
+				}
+
+				// Use custom vehicle movement with rotating bbox
+				// Note: SV_VehicleMove handles collisions internally and may return blocked flags,
+				// but we handle entity movement blocking separately below
+				SV_VehicleMove(part, gi.frame_time_s, MASK_ALL);
+
+				gi.linkentity(part);
+				G_TouchTriggers(part);
+
+				if (!part->inuse)
+					return;
+
+				// Calculate movement delta for entity movement
+				vec3_t move_delta = part->s.origin - old_origin;
+				vec3_t angle_delta = part->s.angles - old_angles;
+
+				// Move entities that are on or inside this vehicle part
+				// Use the proven SV_PushEntities logic
+				if (move_delta[0] || move_delta[1] || move_delta[2] || angle_delta[YAW])
+				{
+					// Save the vehicle part's position in pushed array (for rollback if blocked)
+					pushed_p->ent = part;
+					pushed_p->origin = old_origin;
+					pushed_p->angles = old_angles;
+					pushed_p->rotated = false;
+					pushed_p++;
+
+					// Use SV_PushEntities to move entities on/in the vehicle
+					// It will automatically skip the driver (part->owner) and the vehicle itself
+					if (!SV_PushEntities(part, move_delta, angle_delta))
+					{
+						// Movement was blocked - handle it
+						if (part->moveinfo.blocked)
+							part->moveinfo.blocked(part, obstacle);
+
+						if (!obstacle || !obstacle->inuse)
+							goto retry;
+
+						// Back out all moves (including the vehicle part)
+						for (pushed_t *p = pushed_p - 1; p >= pushed; p--)
+						{
+							p->ent->s.origin = p->origin;
+							p->ent->s.angles = p->angles;
+							if (p->rotated)
+							{
+								if (p->ent->client)
+									p->ent->client->ps.pmove.delta_angles[YAW] = p->yaw;
+								else
+									p->ent->s.angles[YAW] = p->yaw;
+							}
+							gi.linkentity(p->ent);
+						}
+						return;
+					}
+				}
+			}
+		}
+	}
+
+	if (pushed_p > &pushed[MAX_EDICTS])
+		gi.Com_Error("pushed_p > &pushed[MAX_EDICTS], memory corrupted");
+
+	// the move succeeded, so call all think functions
+	for (part = ent; part; part = part->teamchain)
+	{
+		// prevent entities that are on vehicles that have gone away from thinking!
+		if (part->inuse)
+		{
+			// Regular thinking
+			SV_RunThink(part);
+			part->oldvelocity = part->velocity;
+		}
+	}
+
+	// FIXME: is there a better way to handle this?
+	//  see if anything we moved has touched a trigger
+	for (pushed_t *p = pushed_p - 1; p >= pushed; p--)
+		G_TouchTriggers(p->ent);
+}
+
+//============================================================================
 
 /*
 ================
@@ -995,8 +1372,11 @@ void G_RunEntity(edict_t *ent)
 		SV_Physics_NewToss(ent);
 		break;
 	// ROGUE
+	case MOVETYPE_VEHICLE:
+		SV_Physics_Vehicle(ent);
+		break;
 	default:
-		gi.Com_ErrorFmt("SV_Physics: bad movetype {}", (int32_t) ent->movetype);
+		gi.Com_ErrorFmt("SV_Physics: bad movetype {}", (int32_t)ent->movetype);
 	}
 
 	// PGM

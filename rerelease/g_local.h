@@ -769,8 +769,8 @@ enum movetype_t {
 	MOVETYPE_WALLBOUNCE,
 	// RAFAEL
 	// ROGUE
-	MOVETYPE_NEWTOSS // PGM - for deathball
-					 // ROGUE
+	MOVETYPE_NEWTOSS, // PGM - for deathball
+	MOVETYPE_VEHICLE // for func_vehicle
 };
 
 // edict->flags
@@ -1075,7 +1075,8 @@ enum mod_id_t : uint8_t
 	// ROGUE
 	//========
 	MOD_GRAPPLE,
-	MOD_BLUEBLASTER
+	MOD_BLUEBLASTER,
+	MOD_VEHICLE // for func_vehicle
 };
 
 struct mod_t
@@ -3006,6 +3007,9 @@ struct gclient_t
 	gtime_t	 last_attacker_time;
 	// saved - for coop; last time we were in a firing state
 	gtime_t	 last_firing_time;
+
+	// func_vehicle support
+	gtime_t vehicle_framenum; // debounce for mount/dismount
 };
 
 // ==========================================
@@ -3140,6 +3144,12 @@ struct edict_t
 	int32_t	 groundentity_linkcount;
 	edict_t *teamchain;
 	edict_t *teammaster;
+	
+	// func_vehicle support
+	edict_t *vehicle; // vehicle the player is in
+	vec3_t org_size; // original size for rotating bounding box
+	vec3_t oldvelocity; // previous velocity
+	float radius; // turning radius for vehicles
 
 	edict_t *mynoise; // can go in client only
 	edict_t *mynoise2;

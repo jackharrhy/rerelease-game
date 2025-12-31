@@ -33,6 +33,7 @@ void SP_func_killbox(edict_t *ent);
 void SP_func_eye(edict_t *ent); // [Paril-KEX]
 void SP_func_animation(edict_t *ent); // [Paril-KEX]
 void SP_func_spinning(edict_t *ent); // [Paril-KEX]
+void SP_func_vehicle(edict_t *ent);
 
 void SP_trigger_always(edict_t *ent);
 void SP_trigger_once(edict_t *ent);
@@ -243,6 +244,7 @@ static const std::initializer_list<spawn_t> spawns = {
 	{ "func_eye", SP_func_eye },
 	{ "func_animation", SP_func_animation },
 	{ "func_spinning", SP_func_spinning },
+	{ "func_vehicle", SP_func_vehicle },
 
 	{ "trigger_always", SP_trigger_always },
 	{ "trigger_once", SP_trigger_once },
