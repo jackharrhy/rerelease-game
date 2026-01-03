@@ -136,6 +136,10 @@ MATHLIB
 constexpr double PI = 3.14159265358979323846; // matches value in gcc v2 math.h
 constexpr float PIf = static_cast<float>(PI);
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846 // matches value in gcc v2 math.h
+#endif
+
 [[nodiscard]] constexpr float RAD2DEG(float x)
 {
 	return (x * 180.0f / PIf);
