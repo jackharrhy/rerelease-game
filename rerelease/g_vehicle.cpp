@@ -411,7 +411,6 @@ THINK(vehicle_think)(edict_t *self)->void
         gi.linkentity(self);
 
         // Copy velocities and set position of driver
-        vec3_t old_driver_origin = self->owner->s.origin;
         self->owner->velocity = self->velocity;
         self->owner->s.origin = self->s.origin + forward * self->move_origin[0] - left * self->move_origin[1];
         self->owner->s.origin[2] += self->move_origin[2];
