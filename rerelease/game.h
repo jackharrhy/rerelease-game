@@ -424,6 +424,7 @@ enum button_t : uint8_t
     BUTTON_HOLSTER = bit_v<2>, // [Paril-KEX]
     BUTTON_JUMP = bit_v<3>,
     BUTTON_CROUCH = bit_v<4>,
+    BUTTON_ZOOM = bit_v<5>, // notscared
 	BUTTON_ANY = bit_v<7> // any key whatsoever
 };
 

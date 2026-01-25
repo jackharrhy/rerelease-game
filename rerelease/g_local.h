@@ -2939,6 +2939,13 @@ struct gclient_t
 						   // ROGUE
 	//=======
 
+	// notscared - zoom state
+	float    zoom_fov_current;    // current interpolated FOV
+	float    zoom_fov_target;     // target FOV (zoomed or default)
+	gtime_t  zoom_start_time;     // when zoom transition started
+	float    zoom_fov_start;      // FOV at start of transition
+	bool     zoom_active;         // is zoom button held
+
 	gtime_t empty_click_sound;
 
 	// ZOID

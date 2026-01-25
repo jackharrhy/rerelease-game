@@ -2187,6 +2187,13 @@ void PutClientInServer(edict_t *ent)
 	gi.Info_ValueForKey(ent->client->pers.userinfo, "fov", val, sizeof(val));
 	ent->client->ps.fov = clamp((float) atoi(val), 1.f, 160.f);
 
+	// notscared - initialize zoom state
+	ent->client->zoom_fov_current = ent->client->ps.fov;
+	ent->client->zoom_fov_target = ent->client->ps.fov;
+	ent->client->zoom_fov_start = ent->client->ps.fov;
+	ent->client->zoom_start_time = level.time;
+	ent->client->zoom_active = false;
+
 	ent->client->ps.pmove.viewheight = ent->viewheight;
 	ent->client->ps.team_id = ent->client->resp.ctf_team;
 
@@ -2625,6 +2632,12 @@ void ClientUserinfoChanged(edict_t *ent, const char *userinfo)
 	// fov
 	gi.Info_ValueForKey(userinfo, "fov", val, sizeof(val));
 	ent->client->ps.fov = clamp((float) atoi(val), 1.f, 160.f);
+
+	// notscared - update zoom target if not zooming
+	if (!ent->client->zoom_active) {
+		ent->client->zoom_fov_target = ent->client->ps.fov;
+		ent->client->zoom_fov_current = ent->client->ps.fov;
+	}
 
 	// handedness
 	if (gi.Info_ValueForKey(userinfo, "hand", val, sizeof(val)))

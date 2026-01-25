@@ -1403,6 +1403,44 @@ void ClientEndServerFrame(edict_t *ent)
 	CTFApplyRegeneration(ent);
 	// ZOID
 
+	// notscared - zoom handling
+	{
+		constexpr float ZOOM_FOV = 30.f;        // zoomed FOV
+		constexpr gtime_t ZOOM_TIME = 200_ms;   // interpolation duration
+
+		bool zoom_pressed = (ent->client->buttons & BUTTON_ZOOM) != 0;
+		bool zoom_changed = zoom_pressed != ent->client->zoom_active;
+
+		if (zoom_changed) {
+			ent->client->zoom_active = zoom_pressed;
+			ent->client->zoom_fov_start = ent->client->zoom_fov_current;
+			ent->client->zoom_start_time = level.time;
+
+			// Get base FOV from userinfo
+			char val[16];
+			gi.Info_ValueForKey(ent->client->pers.userinfo, "fov", val, sizeof(val));
+			float base_fov = clamp((float)atoi(val), 1.f, 160.f);
+
+			ent->client->zoom_fov_target = zoom_pressed ? ZOOM_FOV : base_fov;
+
+			// Play placeholder sound (jump noise)
+			gi.sound(ent, CHAN_VOICE, gi.soundindex("*jump1.wav"), 1, ATTN_NORM, 0);
+		}
+
+		// Interpolate FOV
+		gtime_t elapsed = level.time - ent->client->zoom_start_time;
+		if (elapsed >= ZOOM_TIME) {
+			ent->client->zoom_fov_current = ent->client->zoom_fov_target;
+		} else {
+			float t = (float)elapsed.milliseconds() / (float)ZOOM_TIME.milliseconds();
+			ent->client->zoom_fov_current = ent->client->zoom_fov_start +
+				(ent->client->zoom_fov_target - ent->client->zoom_fov_start) * t;
+		}
+
+		// Apply FOV
+		current_client->ps.fov = ent->client->zoom_fov_current;
+	}
+
 	AngleVectors(ent->client->v_angle, forward, right, up);
 
 	// burn from lava, etc
