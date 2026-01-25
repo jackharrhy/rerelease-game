@@ -644,7 +644,8 @@ void Cmd_Use_f(edict_t *ent)
 	// Paril: Use_Weapon handles weapon availability
 	if (!(it->flags & IF_WEAPON) && !ent->client->pers.inventory[index])
 	{
-		gi.LocClient_Print(ent, PRINT_HIGH, "$g_out_of_item", it->pickup_name);
+		// NOTE(jackharrhy) silently ignore missing weapons instead of printing message
+		// gi.LocClient_Print(ent, PRINT_HIGH, "$g_out_of_item", it->pickup_name);
 		return;
 	}
 

@@ -628,7 +628,8 @@ void Use_Weapon(edict_t *ent, gitem_t *item)
 
 	if (result == WEAP_SWITCH_VALID)
 		ent->client->newweapon = wanted; // change to this weapon when down
-	// [notscared] Silently ignore missing weapons instead of printing message
+
+	// NOTE(jackharrhy) silently ignore missing weapons instead of printing message
 	// else if ((result = Weapon_AttemptSwitch(ent, wanted, true)) == WEAP_SWITCH_NO_WEAPON && wanted != ent->client->pers.weapon && wanted != ent->client->newweapon)
 	// 	gi.LocClient_Print(ent, PRINT_HIGH, "$g_out_of_item", wanted->pickup_name);
 }
