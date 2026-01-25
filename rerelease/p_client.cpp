@@ -862,7 +862,7 @@ void InitClientPersistant(edict_t *ent, gclient_t *client)
 			// ROGUE
 
 			if (!deathmatch->integer || !g_instagib->integer)
-				client->pers.inventory[IT_WEAPON_BLASTER] = 1;
+				client->pers.inventory[IT_WEAPON_NULL] = 1;
 
 			// [Kex]
 			// start items!
@@ -2194,7 +2194,7 @@ void PutClientInServer(edict_t *ent)
 		ent->clipmask &= ~CONTENTS_PLAYER;
 
 	// PGM
-	if (client->pers.weapon)
+	if (client->pers.weapon && client->pers.weapon->view_model)
 		client->ps.gunindex = gi.modelindex(client->pers.weapon->view_model);
 	else
 		client->ps.gunindex = 0;

@@ -352,7 +352,10 @@ void ChangeWeapon(edict_t *ent)
 
 	ent->client->weaponstate = WEAPON_ACTIVATING;
 	ent->client->ps.gunframe = 0;
-	ent->client->ps.gunindex = gi.modelindex(ent->client->pers.weapon->view_model);
+	if (ent->client->pers.weapon->view_model)
+		ent->client->ps.gunindex = gi.modelindex(ent->client->pers.weapon->view_model);
+	else
+		ent->client->ps.gunindex = 0;
 	ent->client->ps.gunskin = 0;
 	ent->client->weapon_sound = 0;
 
@@ -407,7 +410,8 @@ void NoAmmoWeaponChange(edict_t *ent, bool sound)
 		IT_WEAPON_GLAUNCHER,
 		IT_WEAPON_PROXLAUNCHER,
 		IT_WEAPON_CHAINFIST,
-		IT_WEAPON_BLASTER
+		IT_WEAPON_BLASTER,
+		IT_WEAPON_NULL     // Ultimate fallback
 	};
 
 	for (size_t i = 0; i < q_countof(no_ammo_order); i++)
@@ -1922,4 +1926,11 @@ void Weapon_Beta_Disintegrator(edict_t *ent)
 	constexpr int fire_frames[] = { 17, 0 };
 
 	Weapon_Generic(ent, 16, 23, 46, 50, pause_frames, fire_frames, weapon_disint_fire);
+}
+
+// Null weapon - does nothing, just allows switching to another weapon
+void Weapon_Null(edict_t *ent)
+{
+	if (ent->client->newweapon)
+		ChangeWeapon(ent);
 }

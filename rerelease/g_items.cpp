@@ -33,6 +33,7 @@ void Weapon_Tesla(edict_t *ent);
 void Weapon_ProxLauncher(edict_t *ent);
 // ROGUE
 void Weapon_Beta_Disintegrator(edict_t *ent);
+void Weapon_Null(edict_t *ent);
 
 void	   Use_Quad(edict_t *ent, gitem_t *item);
 static gtime_t quad_drop_timeout_hack;
@@ -1792,6 +1793,29 @@ model="models/items/armor/body/tris.md2"
 	//
 	// WEAPONS 
 	//
+
+// weapon_null - No Weapon placeholder for weaponless gameplay
+	{
+		/* id */ IT_WEAPON_NULL,
+		/* classname */ "weapon_null",
+		/* pickup */ Pickup_Weapon,
+		/* use */ Use_Weapon,
+		/* drop */ nullptr,
+		/* weaponthink */ Weapon_Null,
+		/* pickup_sound */ nullptr,
+		/* world_model */ nullptr,
+		/* world_model_flags */ EF_NONE,
+		/* view_model */ nullptr,           // No first-person model
+		/* icon */ nullptr,
+		/* use_name */ "No Weapon",
+		/* pickup_name */ "No Weapon",
+		/* pickup_name_definite */ "No Weapon",
+		/* quantity */ 0,
+		/* ammo */ IT_NULL,
+		/* chain */ IT_NULL,
+		/* flags */ IF_WEAPON | IF_STAY_COOP | IF_NOT_RANDOM,
+		/* vwep_model */ nullptr,           // No third-person model
+	},
 
 /* weapon_grapple (.3 .3 1) (-16 -16 -16) (16 16 16)
 always owned, never in the world

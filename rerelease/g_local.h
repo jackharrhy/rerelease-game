@@ -870,6 +870,7 @@ enum item_id_t : int32_t {
 	IT_ITEM_POWER_SCREEN,
 	IT_ITEM_POWER_SHIELD,
 
+	IT_WEAPON_NULL,    // No weapon - invisible/default
 	IT_WEAPON_GRAPPLE,
 	IT_WEAPON_BLASTER,
 	IT_WEAPON_CHAINFIST,
