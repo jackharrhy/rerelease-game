@@ -3093,6 +3093,7 @@ struct edict_t
 	const char *healthtarget;
 	const char *itemtarget; // [Paril-KEX]
 	const char *combattarget;
+	const char *server_address; // NOTE(notscared) target server for trigger_server_portal
 	edict_t	*target_ent;
 
 	float  speed, accel, decel;

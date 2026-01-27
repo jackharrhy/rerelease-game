@@ -23,6 +23,7 @@ src = [
   'rerelease/g_misc.cpp',
   'rerelease/g_monster.cpp',
   'rerelease/g_phys.cpp',
+  'rerelease/g_portal.cpp',
   'rerelease/g_save.cpp',
   'rerelease/g_spawn.cpp',
   'rerelease/g_statusbar.h',

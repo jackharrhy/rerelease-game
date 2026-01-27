@@ -114,6 +114,7 @@ void SP_misc_bigviper(edict_t *self);
 void SP_misc_strogg_ship(edict_t *self);
 void SP_misc_teleporter(edict_t *self);
 void SP_misc_teleporter_dest(edict_t *self);
+void SP_trigger_server_portal(edict_t *self); // NOTE(notscared) server portal
 void SP_misc_blackhole(edict_t *self);
 void SP_misc_eastertank(edict_t *self);
 void SP_misc_easterchick(edict_t *self);
@@ -396,6 +397,7 @@ static const std::initializer_list<spawn_t> spawns = {
 	{ "func_door_secret2", SP_func_door_secret2 },
 	{ "func_force_wall", SP_func_force_wall },
 	{ "trigger_teleport", SP_trigger_teleport },
+	{ "trigger_server_portal", SP_trigger_server_portal }, // NOTE(notscared)
 	{ "trigger_disguise", SP_trigger_disguise },
 	{ "info_teleport_destination", SP_info_teleport_destination },
 	{ "info_player_coop_lava", SP_info_player_coop_lava },
@@ -687,6 +689,7 @@ static const std::initializer_list<field_t> entity_fields = {
 	FIELD_AUTO(itemtarget),
 	FIELD_AUTO(killtarget),
 	FIELD_AUTO(combattarget),
+	FIELD_AUTO(server_address), // NOTE(notscared) for trigger_server_portal
 	FIELD_AUTO(message),
 	FIELD_AUTO(team),
 	FIELD_AUTO(wait),
