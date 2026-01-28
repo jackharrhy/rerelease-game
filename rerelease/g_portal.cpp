@@ -1,27 +1,16 @@
 // Copyright (c) ZeniMax Media Inc.
 // Licensed under the GNU General Public License 2.0.
 
-// NOTE(notscared) Server portal - teleports player to another game server
+// NOTE(notscared) Server portal - transfers player to another backend server via proxy
 
 #include "g_local.h"
 
-/*
- * Helper function to stuff a console command to a specific client.
- * This sends the command string to the client's console buffer.
- */
-static void stuffcmd(edict_t *ent, const char *cmd)
-{
-	gi.WriteByte(svc_stufftext);
-	gi.WriteString(cmd);
-	gi.unicast(ent, true);
-}
-
 /*QUAKED trigger_server_portal (.5 .5 .5) ?
-Portal to another server. When touched by a player, the client
-will disconnect from the current server and connect to the target server.
+Portal to another backend server. When touched by a player, the proxy
+will transfer them to the target server seamlessly.
 
 Keys:
-server_address: IP:Port of the target server (e.g. "192.168.1.50:27910")
+target_server: Name of the backend server (e.g. "hub", "test1")
 message: Optional message shown to player before transfer
 wait: Cooldown in seconds before the same player can use the portal again (default 2)
 */
@@ -32,10 +21,10 @@ TOUCH(trigger_server_portal_touch) (edict_t *self, edict_t *other, const trace_t
 	if (!other->client)
 		return;
 
-	// Check if server_address is set
-	if (!self->server_address || !*self->server_address)
+	// Check if target_server is set
+	if (!self->target_server || !*self->target_server)
 	{
-		gi.Com_Print("trigger_server_portal: no server_address set!\n");
+		gi.Com_Print("trigger_server_portal: no target_server set!\n");
 		return;
 	}
 
@@ -52,11 +41,11 @@ TOUCH(trigger_server_portal_touch) (edict_t *self, edict_t *other, const trace_t
 		gi.Center_Print(other, self->message);
 
 	// Log the transfer
-	gi.Com_Print(G_Fmt("Player {} connecting to server {}\n", 
-		other->client->pers.netname, self->server_address).data());
+	gi.Com_Print(G_Fmt("Player {} transferring to server {}\n", 
+		other->client->pers.netname, self->target_server).data());
 
-	// Send connect command to this client only
-	stuffcmd(other, G_Fmt("connect {}\n", self->server_address).data());
+	// Request transfer via proxy
+	gi.RequestTransfer(other, self->target_server);
 }
 
 void SP_trigger_server_portal(edict_t *self)
@@ -65,10 +54,10 @@ void SP_trigger_server_portal(edict_t *self)
 	if (!self->wait)
 		self->wait = 2.0f;
 
-	// Validate server_address
-	if (!self->server_address || !*self->server_address)
+	// Validate target_server
+	if (!self->target_server || !*self->target_server)
 	{
-		gi.Com_Print("trigger_server_portal without server_address\n");
+		gi.Com_Print("trigger_server_portal without target_server\n");
 		G_FreeEdict(self);
 		return;
 	}

@@ -689,7 +689,7 @@ static const std::initializer_list<field_t> entity_fields = {
 	FIELD_AUTO(itemtarget),
 	FIELD_AUTO(killtarget),
 	FIELD_AUTO(combattarget),
-	FIELD_AUTO(server_address), // NOTE(notscared) for trigger_server_portal
+	FIELD_AUTO(target_server), // NOTE(notscared) for trigger_server_portal
 	FIELD_AUTO(message),
 	FIELD_AUTO(team),
 	FIELD_AUTO(wait),
